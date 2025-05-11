@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Consciousness & Spatial Dimensions Webapp</title>
+  <style>
+    /* Dark mode styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      background: #000;
+      color: #fff;
+    }
+    /* Canvas covers viewport */
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+    /* Tall container for scrolling */
+    .scroll-container {
+      height: 400vh;
+    }
+    /* Parameter panel toggled by triple 'h' */
+    #paramsPanel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(30, 30, 30, 0.9);
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+      z-index: 1000;
+      font-family: sans-serif;
+    }
+    #paramsPanel label {
+      display: block;
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    #paramsPanel input[type=range] {
+      width: 120px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="scroll-container"></div>
+
+  <!-- Parameter panel: press 'h' three times to toggle -->
+  <div id="paramsPanel">
+    <label>Zoom X: <input type="range" id="zoomX" min="0.5" max="2" step="0.01" value="1"></label>
+    <label>Zoom Y: <input type="range" id="zoomY" min="0.5" max="2" step="0.01" value="1"></label>
+    <label>Rot XY speed: <input type="range" id="rotXY" min="-2" max="2" step="0.01" value="1"></label>
+    <label>Rot XZ speed: <input type="range" id="rotXZ" min="-2" max="2" step="0.01" value="1"></label>
+    <label>Rot XW speed: <input type="range" id="rotXW" min="-2" max="2" step="0.01" value="1"></label>
+    <label>Rot YW speed: <input type="range" id="rotYW" min="-2" max="2" step="0.01" value="1"></label>
+  </div>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Parameters
+      let zoomX = 1, zoomY = 1;
+      let rotXY = 1, rotXZ = 1, rotXW = 1, rotYW = 1;
+
+      // Triple 'h' toggle
+      const keyBuffer = [];
+      window.addEventListener('keydown', e => {
+        const now = Date.now();
+        keyBuffer.push({ key: e.key, time: now });
+        while (keyBuffer.length > 3) keyBuffer.shift();
+        if (keyBuffer.length === 3 && keyBuffer.every(k => k.key === 'h') && now - keyBuffer[0].time < 1000) {
+          const panel = document.getElementById('paramsPanel');
+          panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+      });
+
+      // Slider listeners
+      document.getElementById('zoomX').addEventListener('input', e => zoomX = parseFloat(e.target.value));
+      document.getElementById('zoomY').addEventListener('input', e => zoomY = parseFloat(e.target.value));
+      document.getElementById('rotXY').addEventListener('input', e => rotXY = parseFloat(e.target.value));
+      document.getElementById('rotXZ').addEventListener('input', e => rotXZ = parseFloat(e.target.value));
+      document.getElementById('rotXW').addEventListener('input', e => rotXW = parseFloat(e.target.value));
+      document.getElementById('rotYW').addEventListener('input', e => rotYW = parseFloat(e.target.value));
+
+      // Resize canvas
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      // Scroll progress
+      function getScrollProgress() {
+        return window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+      }
+
+      // Label for consciousness state
+      function drawStateLabel(progress) {
+        let label = "";
+        if (progress < 0.25) label = "No Consciousness (0D)";
+        else if (progress < 0.5) label = "Vegetative State (1D)";
+        else if (progress < 0.75) label = "Full Consciousness (3D)";
+        else label = "Altered States (4D)";
+        ctx.save();
+        ctx.font = "24px sans-serif";
+        ctx.fillStyle = "#fff";
+        ctx.fillText(label, 20, 40);
+        ctx.restore();
+      }
+
+      // Base hypercube vertices and edges
+      const baseVerts = [];
+      for (let xi of [-1,1]) for (let yi of [-1,1]) for (let zi of [-1,1]) for (let wi of [-1,1]) {
+        baseVerts.push({x: xi, y: yi, z: zi, w: wi});
+      }
+      const edges = [];
+      for (let i = 0; i < baseVerts.length; i++) {
+        for (let j = i+1; j < baseVerts.length; j++) {
+          let diff = 0;
+          ['x','y','z','w'].forEach(a => { if (baseVerts[i][a] !== baseVerts[j][a]) diff++; });
+          if (diff === 1) edges.push([i, j]);
+        }
+      }
+
+      function rotate4D(v, i, j, theta) {
+        const axes = ['x','y','z','w'];
+        const ai = axes[i], aj = axes[j];
+        const vi = v[ai], vj = v[aj];
+        v[ai] = vi * Math.cos(theta) - vj * Math.sin(theta);
+        v[aj] = vi * Math.sin(theta) + vj * Math.cos(theta);
+      }
+
+      // Animation loop
+      function animate() {
+        const progress = getScrollProgress();
+        const center = { x: canvas.width/2, y: canvas.height/2 };
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (progress < 0.25) drawDotToLine(progress/0.25, center);
+        else if (progress < 0.5) drawLine(center, 1);
+        else if (progress < 0.75) {
+          const t = (progress-0.5)/0.25;
+          drawLine(center, 1-t);
+          drawCube(center, Math.min(canvas.width, canvas.height)*0.2, progress*Math.PI*2, t);
+        } else {
+          // Draw full 4D tesseract
+          drawTesseract(center, Math.min(canvas.width, canvas.height)*0.25);
+        }
+
+        drawStateLabel(progress);
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+
+      // Helper draws
+      function drawDotToLine(t, center) {
+        const len = t * Math.min(canvas.width, canvas.height) * 0.3;
+        ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(center.x-len/2, center.y); ctx.lineTo(center.x+len/2, center.y); ctx.stroke();
+        if (t < 0.1) { ctx.beginPath(); ctx.fillStyle = "#fff"; ctx.arc(center.x, center.y, 5, 0, 2*Math.PI); ctx.fill(); }
+        ctx.restore();
+      }
+      function drawLine(center, opacity) {
+        ctx.save(); ctx.globalAlpha = opacity; ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
+        const len = Math.min(canvas.width, canvas.height) * 0.3;
+        ctx.beginPath(); ctx.moveTo(center.x-len/2, center.y); ctx.lineTo(center.x+len/2, center.y); ctx.stroke();
+        ctx.restore();
+      }
+      function drawCube(center, size, rotation, opacity) {
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rotation);
+        ctx.globalAlpha = opacity;
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        const half = size/2;
+        const front = [{x:-half,y:-half},{x:half,y:-half},{x:half,y:half},{x:-half,y:half}];
+        const back  = front.map(p => ({x: p.x+size*0.3, y: p.y-size*0.3}));
+        // draw faces and edges
+        ctx.beginPath(); front.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath(); ctx.stroke();
+        ctx.beginPath(); back .forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath(); ctx.stroke();
+        ctx.beginPath(); for (let i=0; i<4; i++){ ctx.moveTo(front[i].x, front[i].y); ctx.lineTo(back[i].x, back[i].y); } ctx.stroke();
+        ctx.restore();
+      }
+
+      // Updated tesseract draw
+      function drawTesseract(center, size) {
+        // Prepare rotated vertices
+        const verts = baseVerts.map(v => ({...v}));
+        const t = Date.now()/1000;
+        const aXY = t * rotXY, aXZ = t * rotXZ, aXW = t * rotXW, aYW = t * rotYW;
+        verts.forEach(v => {
+          rotate4D(v, 0, 1, aXY);
+          rotate4D(v, 0, 2, aXZ);
+          rotate4D(v, 0, 3, aXW);
+          rotate4D(v, 1, 3, aYW);
+        });
+        // Project to 2D
+        const projected = verts.map(v => {
+          const persp = size * 1.5 / (size*1.5 - v.w * size);
+          return { x: v.x * size * persp, y: v.y * size * persp };
+        });
+        // Draw edges
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.scale(zoomX, zoomY);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        edges.forEach(([i, j]) => {
+          const p1 = projected[i], p2 = projected[j];
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
+    })();
+  </script>
+</body>
+</html>

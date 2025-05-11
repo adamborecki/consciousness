@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Consciousness & Spatial Dimensions Webapp</title>
+<style>
+html,body{margin:0;padding:0;overflow-x:hidden;background:#000;color:#fff}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%;background:#000}
+.scroll-container{height:500vh}
+/* fullscreen button */
+#enterFull{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:14px 28px;font:2rem sans-serif;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;cursor:pointer;transition:background .3s,opacity .6s}
+#enterFull:hover{background:rgba(255,255,255,.18)}
+/* scroll prompt */
+#scrollPrompt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font:2rem sans-serif;opacity:0;transition:opacity .8s ease;pointer-events:none;display:none}
+/* panel */
+#paramsPanel{position:fixed;bottom:20px;left:20px;background:rgba(30,30,30,.9);color:#fff;padding:10px;border-radius:5px;display:none;z-index:1000;max-width:270px;font-family:sans-serif}
+#paramsPanel label{display:block;margin:8px 0;font-size:14px}
+#paramsPanel input[type=range]{width:120px;vertical-align:middle}
+#paramsPanel span{margin-left:6px;font-size:12px;color:#ccc}
+#stateInfo{font-size:13px;line-height:1.3}
+.oriBtn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;font:600 13px/1 sans-serif;padding:4px 8px;border-radius:4px;cursor:pointer}
+.oriBtn:active{background:rgba(255,255,255,.3)}
+hr{border-color:#444;margin:6px 0}
+
+/* corner orientation buttons */
+.corner-orient-btns {
+  position: fixed;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+#cornerTopLeft { top: 10px; left: 10px; }
+#cornerTopRight { top: 10px; right: 10px; }
+#cornerBottomLeft { bottom: 10px; left: 10px; }
+#cornerBottomRight { bottom: 10px; right: 10px; }
+.corner-orient-btns.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
+/* corner buttons */
+.corner-btn {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+  transition: background .3s, opacity .6s ease;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.3);
+  font-family: sans-serif;
+  font-size: 1.2rem;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+#cornerTL {  position: fixed; top: 30%; left: 30%;  }
+#cornerTR {  position: fixed; top: 30%; left: 70%;  }
+#cornerBL {  position: fixed; top: 70%; left: 30%;  }
+#cornerBR {  position: fixed; top: 70%; left: 70%;  }
+
+
+#cornerTL.show > button,
+#cornerTR.show > button,
+#cornerBL.show > button,
+#cornerBR.show > button {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+
+/* center corner buttons within their containers */
+.corner-orient-btns > button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="enterFull">Enter Fullscreen</div>
+<div id="scrollPrompt">Scroll&nbsp;down&nbsp;↓</div>
+<div class="scroll-container"></div>
+
+<div id="paramsPanel">
+  <div id="orientationBtns" style="display:flex;gap:6px;flex-wrap:wrap">
+    <button class="oriBtn" data-key="cube">Cube</button>
+    <button class="oriBtn" data-key="square">Square</button>
+    <button class="oriBtn" data-key="line">Line</button>
+    <button class="oriBtn" data-key="corner">Corner</button>
+  </div>
+  <hr/>
+  <label>Zoom X:<input type="range" id="zoomX" min="0.5" max="4" step="0.01" value="2"/><span id="zoomXVal">2.00</span></label>
+  <label>Zoom Y:<input type="range" id="zoomY" min="0.5" max="4" step="0.01" value="2"/><span id="zoomYVal">2.00</span></label>
+  <hr/>
+  <label>Return Time:<input type="range" id="retMaster" min="0.1" max="10" step="0.1" value="0.6"/><span id="retMasterVal">0.6s</span></label>
+  <label>Neighbor Impact:<input type="range" id="impactNeighbors" min="0" max="1" step="0.01" value="0.5"/><span id="impactNeighborsVal">0.50×</span></label>
+  <hr/>
+  <label>Rot XY:<input type="range" id="rotXY" min="-5" max="5" step="0.1" value="0"/><span id="rotXYVal">0.00</span></label>
+  <label>Rot XZ:<input type="range" id="rotXZ" min="-5" max="5" step="0.1" value="0"/><span id="rotXZVal">0.00</span></label>
+  <label>Rot XW:<input type="range" id="rotXW" min="-5" max="5" step="0.1" value="0"/><span id="rotXWVal">0.00</span></label>
+  <label>Rot YZ:<input type="range" id="rotYZ" min="-5" max="5" step="0.1" value="0"/><span id="rotYZVal">0.00</span></label>
+  <label>Rot YW:<input type="range" id="rotYW" min="-5" max="5" step="0.1" value="0"/><span id="rotYWVal">0.00</span></label>
+  <label>Rot ZW:<input type="range" id="rotZW" min="-5" max="5" step="0.1" value="0"/><span id="rotZWVal">0.00</span></label>
+  <hr/>
+  <div id="stateInfo"></div>
+</div> <!-- end paramsPanel -->
+<!-- corner orientation buttons -->
+<div id="cornerTL" class="corner-orient-btns"></div>
+<div id="cornerTR" class="corner-orient-btns"></div>
+<div id="cornerBL" class="corner-orient-btns"></div>
+<div id="cornerBR" class="corner-orient-btns"></div>
+
+
+<script>
+(function(){
+  const canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
+  const resize=()=>{canvas.width=innerWidth;canvas.height=innerHeight};addEventListener("resize",resize);resize();
+
+  /* fullscreen and prompt */
+  const fullBtn = document.getElementById("enterFull"),
+        prompt = document.getElementById("scrollPrompt");
+  let promptVisible = false;
+  const fsEnabled = document.fullscreenEnabled;
+  fullBtn.addEventListener('click', async () => {
+    if (fsEnabled && !document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+        fullBtn.style.display = 'none';
+        prompt.style.display = 'block';
+        requestAnimationFrame(() => prompt.style.opacity = 1);
+        promptVisible = true;
+      } catch (e) {
+        console.error('Error attempting to enable full-screen mode:', e);
+      }
+    }
+  });
+  window.addEventListener('scroll', () => {
+    if (promptVisible) {
+      prompt.style.opacity = 0;
+      promptVisible = false;
+    }
+  }, { passive: true });
+
+  /* state data */
+
+  const stateData=[{State:"Coma",Awake:false,Aware:false,Eyes:false,Moves:false,Talks:false,Brain:"⚫ (Flat)","3D":"• Point",Audio:"🎵 Single Note"},
+  {State:"UWS",Awake:true,Aware:false,Eyes:true,Moves:false,Talks:false,Brain:"⚪ (Low)","3D":"— Line",Audio:"🔁 Pan (L↔R)"},
+  {State:"MCS",Awake:true,Aware:"⚠️ Partial",Eyes:true,Moves:"⚠️ Inconsistent",Talks:"⚠️ Inconsistent",Brain:"🟡 (Mixed)","3D":"▭ Square",Audio:"📏 Depth (vol/rev)"},
+  {State:"Full",Awake:true,Aware:true,Eyes:true,Moves:true,Talks:true,Brain:"🟢 (Normal)","3D":"◻ Cube",Audio:"🎧 3D + Frequency"},
+  {State:"Altered",Awake:true,Aware:"⚠️/✅",Eyes:"✅/⚠️",Moves:"✅/⚠️",Talks:"⚠️/✅",Brain:"🌈 (Expanded)","3D":"⬛ Tesseract",Audio:"🧠 MS / Binaural"}];
+  const stateInfo=document.getElementById("stateInfo");const showState=i=>{const s=stateData[i];stateInfo.innerHTML=`<strong>${s.State}</strong><br>
+  Awake: ${s.Awake}<br>Aware: ${s.Aware}<br>Eyes: ${s.Eyes}<br>Moves: ${s.Moves}<br>Talks: ${s.Talks}<br>Brain: ${s.Brain}<br>3D: ${s["3D"]}<br>Audio: ${s.Audio}`};
+
+  /* physics vars */
+  const pairs=["xy","xz","xw","yz","yw","zw"];const raw={},target={},cur={},ang={},def={};pairs.forEach(k=>raw[k]=target[k]=cur[k]=ang[k]=def[k]=0);
+  const neighbors={xy:["xz","xw","yz","yw"],xz:["xy","xw","yz","zw"],xw:["xy","xz","yw","zw"],yz:["xy","xz","yw","zw"],yw:["xy","xz","yz","zw"],zw:["xz","xw","yw","yz"]};
+  let masterTime=0.6,neighborImpact=0.5,zoomX=2,zoomY=2,stiff=0.05,damp=0.9;
+
+  /* orientation buttons (spring via def*) */
+  const presets={cube:{xy:0,xz:0,xw:0,yz:0,yw:0,zw:0},square:{xy:Math.PI/2,xz:0,xw:0,yz:0,yw:0,zw:0},line:{xy:0,xz:Math.PI/2,xw:0,yz:0,yw:0,zw:0},corner:{xy:Math.PI/4,xz:Math.PI/4,xw:Math.PI/4,yz:Math.PI/4,yw:Math.PI/4,zw:Math.PI/4}};
+  let backup=null;const setDef=p=>pairs.forEach(k=>def[k]=p[k]);
+  document.querySelectorAll(".oriBtn").forEach(b => {
+    const key = b.dataset.key;
+    b.addEventListener('click', () => {
+      setDef(presets[key]);
+    });
+  });
+
+  /* sliders */
+  const bind=(id,cb)=>{const s=document.getElementById(id),v=document.getElementById(id+"Val");s.oninput=e=>{cb(+e.target.value);if(v)v.textContent=id==="impactNeighbors"?e.target.value+"×":(+e.target.value).toFixed(2)}};
+  bind("zoomX",v=>zoomX=v);bind("zoomY",v=>zoomY=v);bind("retMaster",v=>masterTime=v);bind("impactNeighbors",v=>neighborImpact=v);
+  pairs.forEach(p=>{const el=document.getElementById("rot"+p.toUpperCase());el.oninput=e=>raw[p]=+e.target.value;el.onpointerup=()=>raw[p]=0});
+
+  /* triple‑h toggle */
+  const panel=document.getElementById("paramsPanel"),log=[];addEventListener("keydown",e=>{const t=Date.now();log.push(t);log.length>3&&log.shift();if(e.key==="h"&&log[2]-log[0]<1000)panel.style.display=panel.style.display==="block"?"none":"block"});
+
+  /* geometry */
+  const verts=[];for(const xi of[-1,1])for(const yi of[-1,1])for(const zi of[-1,1])for(const wi of[-1,1])verts.push({x:xi,y:yi,z:zi,w:wi});
+  const edges=[];for(let i=0;i<verts.length;i++)for(let j=i+1;j<verts.length;j++){if(["x","y","z","w"].filter(a=>verts[i][a]!==verts[j][a]).length===1)edges.push([i,j])}
+
+  const rot=(v,i,j,θ)=>{
+    const a=["x","y","z","w"][i],b=["x","y","z","w"][j],ai=v[a],bi=v[b];
+    v[a]=ai*Math.cos(θ)-bi*Math.sin(θ);v[b]=ai*Math.sin(θ)+bi*Math.cos(θ);
+  };
+
+  /* animation */
+  let last=performance.now(),stateIdx=-1;
+  function loop(now){
+    const dt=(now-last)/1000;last=now;
+    const prog=scrollY/(document.documentElement.scrollHeight-innerHeight);
+    const idx=prog<.2?0:prog<.4?1:prog<.6?2:prog<.8?3:4;if(idx!==stateIdx){stateIdx=idx;showState(idx)}
+    pairs.forEach(k=>{let s=raw[k]+neighborImpact*neighbors[k].reduce((sum,n)=>sum+raw[n],0);target[k]=s});
+    pairs.forEach(k=>{cur[k]+=(target[k]-cur[k])*stiff;cur[k]*=damp;ang[k]+=cur[k]*dt;ang[k]+=(def[k]-ang[k])*(dt/masterTime)});
+    const sX=Math.min(prog/.2,1),sY=Math.min(Math.max((prog-.2)/.2,0),1),sZ=Math.min(Math.max((prog-.4)/.2,0),1),sW=Math.min(Math.max((prog-.6)/.2,0),1),f=Math.min(Math.max((prog-.8)/.2,0),1);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    draw({sX,sY,sZ,sW,f});
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function draw(dim){
+    const {sX,sY,sZ,sW}=dim;
+    const tmp=verts.map(v=>({x:v.x*sX,y:v.y*sY,z:v.z*sZ,w:v.w*sW}));
+    tmp.forEach(v=>{rot(v,0,1,ang.xy);rot(v,0,2,ang.xz);rot(v,0,3,ang.xw);rot(v,1,2,ang.yz);rot(v,1,3,ang.yw);rot(v,2,3,ang.zw)});
+    const pr=tmp.map(v=>{const k=300/(300-v.w*150);return{x:v.x*150*k,y:v.y*150*k}});
+    ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoomX,zoomY);ctx.lineWidth=2;
+    edges.forEach(e=>{const p1=pr[e[0]],p2=pr[e[1]];ctx.strokeStyle="#fff";ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke()});
+    ctx.restore();
+  }
+
+
+  function showCornerButtons() {
+    corners.forEach(pos => {
+      const el = document.getElementById('corner' + pos);
+      el.classList.add('show');
+    });
+  }
+  window.addEventListener('scroll', () => {
+    if (!cornersShown) {
+      const scrollPos = window.scrollY + window.innerHeight;
+      const threshold = document.body.scrollHeight - 100;
+      if (scrollPos >= threshold) {
+        setupCornerButtons();
+        showCornerButtons();
+        cornersShown = true;
+      }
+    }
+  }, { passive: true });
+
+
+  // corner buttons fade-in on near-bottom scroll
+  const cornerConfigs = [
+    { id: 'cornerTL', key: 'cube', label: 'Cube' },
+    { id: 'cornerTR', key: 'square', label: 'Square' },
+    { id: 'cornerBL', key: 'line', label: 'Line' },
+    { id: 'cornerBR', key: 'corner', label: 'Corner' }
+  ];
+  let cornersShown = false;
+  function setupCornerButtons() {
+    cornerConfigs.forEach(cfg => {
+      const btn = document.createElement('button');
+      btn.className = 'corner-btn';
+      btn.dataset.key = cfg.key;
+      btn.textContent = cfg.label;
+            btn.addEventListener('click', () => { setDef(presets[cfg.key]); });
+      document.getElementById(cfg.id).appendChild(btn);
+    });
+  }
+  function showCornerButtons() {
+    cornerConfigs.forEach(cfg => {
+      const el = document.getElementById(cfg.id);
+      el.classList.add('show');
+    });
+  }
+  window.addEventListener('scroll', () => {
+    if (!cornersShown) {
+      const scrollPos = window.scrollY + window.innerHeight;
+      const threshold = document.body.scrollHeight - 100;
+      if (scrollPos >= threshold) {
+        setupCornerButtons();
+        showCornerButtons();
+        cornersShown = true;
+      }
+    }
+  }, { passive: true });
+
+})();</script>
+</body></html>

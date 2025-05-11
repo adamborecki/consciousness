@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Consciousness Hypercube Visualizer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html,body{margin:0;padding:0;background:#000;color:#fff;overflow:hidden;font-family:sans-serif}
+    canvas{position:fixed;inset:0;width:100%;height:100%}
+    #btnMic{position:fixed;top:16px;left:16px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:rgba(0,0,0,.5);cursor:pointer;z-index:2000}
+    #configPanel{position:fixed;bottom:20px;left:20px;max-height:60vh;overflow:auto;background:rgba(30,30,30,.9);padding:12px;border-radius:6px;display:none;z-index:2000;width:320px}
+    #configTabs{display:flex;gap:8px;margin-bottom:8px}
+    #configTabs button{flex:1;background:#444;border:none;color:#fff;padding:4px;border-radius:4px;cursor:pointer}
+    #configTabs button.active{background:#666}
+    .section{display:none}
+    .section.active{display:block}
+    .control{margin:6px 0;font-size:13px}
+    .control label{display:flex;justify-content:space-between;align-items:center}
+    .routingRow,.pitchRow{display:grid;grid-template-columns:1fr 1fr 64px 24px;gap:4px;align-items:center;margin-bottom:4px}
+    .routingRow select,.pitchRow input,.pitchRow select{width:100%;font-size:12px}
+    .routingRow input[type=range]{width:100%}
+    .addBtn{display:block;width:100%;margin:8px 0;padding:4px;border:1px dashed #777;background:none;color:#aaa;cursor:pointer}
+    #presetBar{display:flex;gap:4px;margin-top:8px}
+    #presetBar input{flex:1}
+    #presetBar button{padding:4px 6px}
+  </style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <button id="btnMic">🎙 Enable Mic</button>
+  <div id="configPanel">
+    <div id="configTabs">
+      <button data-tab="params" class="active">Params</button>
+      <button data-tab="routing">Routing</button>
+      <button data-tab="pitch">Pitch Presets</button>
+      <button data-tab="presets">Presets</button>
+    </div>
+    <div id="paramsSec" class="section active"></div>
+    <div id="routingSec" class="section"></div>
+    <div id="pitchSec" class="section"></div>
+    <div id="presetsSec" class="section"></div>
+  </div>
+  <script type="module">
+    /* --- external libs --- */
+    import "https://cdn.jsdelivr.net/npm/meyda@5.6.3/dist/web/meyda.min.js";
+    import LZString from "https://cdn.jsdelivr.net/npm/lz-string@1.5.0/+esm";
+
+    /* ---------- 1. PARAMETER DEFINITIONS ---------- */
+    const PARAM_DEFS=[
+      {id:"zoomX",label:"Zoom X",type:"range",min:0.5,max:2,step:0.01,def:1},
+      {id:"zoomY",label:"Zoom Y",type:"range",min:0.5,max:2,step:0.01,def:1},
+      {id:"retMaster",label:"Return Time",type:"range",min:0.1,max:10,step:0.1,def:0.6},
+      {id:"impactNeighbors",label:"Neighbor Impact",type:"range",min:0,max:1,step:0.01,def:0.5},
+      {id:"rotXY",label:"Rot XY",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"rotXZ",label:"Rot XZ",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"rotXW",label:"Rot XW",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"rotYZ",label:"Rot YZ",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"rotYW",label:"Rot YW",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"rotZW",label:"Rot ZW",type:"range",min:-5,max:5,step:0.1,def:0},
+      {id:"colorScheme",label:"Color Scheme",type:"select",options:["grayscale","monochrome","steppedRainbow","smoothRainbow","mood"],def:"grayscale"},
+      {id:"overlayEffect",label:"Overlay",type:"select",options:["none","glow","particles"],def:"none"}
+    ];
+
+    /* ---------- 2. PARAM STORE ---------- */
+    class ParamStore{
+      constructor(defs){
+        this._vals={};
+        defs.forEach(d=>this._vals[d.id]=d.def);
+        this.subs=new Set();
+      }
+      get(id){return this._vals[id];}
+      set(id,val){if(this._vals[id]===val) return;this._vals[id]=val;this.subs.forEach(fn=>fn(id,val));}
+      onChange(fn){this.subs.add(fn);}  // simple pub/sub
+      toJSON(){return JSON.parse(JSON.stringify(this._vals));}
+      fromJSON(o){Object.keys(o).forEach(k=>this.set(k,o[k]));}
+    }
+
+    const params=new ParamStore(PARAM_DEFS);
+
+    /* ---------- 3. INPUT LAYER ---------- */
+    class InputLayer{
+      constructor(){
+        this.values={};
+        /* scroll */
+        addEventListener("scroll",()=>{
+          const pr=scrollY/(document.documentElement.scrollHeight-innerHeight);
+          this.values.scroll=pr;
+        },{passive:true});
+        /* mouse tilt fallback */
+        addEventListener("mousemove",e=>{
+          this.values.tiltX=(e.clientX/innerWidth)*2-1;
+          this.values.tiltY=(e.clientY/innerHeight)*2-1;
+        });
+        /* device orientation */
+        addEventListener("deviceorientation",e=>{
+          if(e.beta!==null){ // portrait beta = front/back tilt
+            this.values.tiltX=e.gamma/45; // ~ -1..1
+            this.values.tiltY=e.beta/45;
+          }
+        });
+        /* placeholder for mic */
+        this._setupMic();
+      }
+      async _setupMic(){
+        const btn=document.getElementById("btnMic");
+        btn.onclick=async()=>{
+          try{
+            const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+            btn.style.display="none";
+            const ctx=new (window.AudioContext||window.webkitAudioContext)();
+            const src=ctx.createMediaStreamSource(stream);
+            const analyzer=Meyda.createMeydaAnalyzer({
+              audioContext:ctx,source:src,bufferSize:2048,featureExtractors:["rms","spectralCentroid","chroma"],callback:feat=>{
+                const chroma=feat.chroma; // 12‑bin array
+                const maxIdx=chroma.indexOf(Math.max(...chroma));
+                const pitchNames=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+                this.values.pitchClass=pitchNames[maxIdx];
+                this.values.timbreCentroid=feat.spectralCentroid/8000; // ~0‑1
+              }
+            });
+            analyzer.start();
+          }catch(err){alert("Mic access denied: "+err.message);}
+        };
+      }
+      update(time){
+        // can add time‑based signals here
+        this.values.time=time/1000;
+      }
+    }
+
+    const inputLayer=new InputLayer();
+
+    /* ---------- 4. MOD MATRIX ---------- */
+    const DEFAULT_ROUTING=[
+      {source:"scroll",target:"zoomX",mode:"scale",depth:1},
+      {source:"scroll",target:"zoomY",mode:"scale",depth:1},
+      {source:"tiltX",target:"rotXY",mode:"add",depth:2},
+      {source:"tiltY",target:"rotXZ",mode:"add",depth:2},
+      {source:"pitchClass",target:"*MULTI*",mode:"preset"}
+    ];
+
+    const PITCH_PRESETS={
+      C:{colorScheme:"grayscale",rotXY:0},
+      "C#":{colorScheme:"monochrome",rotXY:1},
+      D:{colorScheme:"steppedRainbow",rotXY:0.5},
+      "D#":{colorScheme:"smoothRainbow",rotXY:-0.5},
+      E:{colorScheme:"mood",rotXY:-1},
+      F:{colorScheme:"grayscale",rotXY:1.2},
+      "F#":{colorScheme:"monochrome",rotXY:-1.2},
+      G:{colorScheme:"steppedRainbow",rotXY:0.8},
+      "G#":{colorScheme:"smoothRainbow",rotXY:-0.8},
+      A:{colorScheme:"mood",rotXY:1.5},
+      "A#":{colorScheme:"grayscale",rotXY:-1.5},
+      B:{colorScheme:"monochrome",rotXY:0},
+      default:{colorScheme:"grayscale",rotXY:0}
+    };
+
+    class ModMatrix{
+      constructor(rows){this.rows=rows;}
+      process(inputs){
+        for(const row of this.rows){
+          const val=inputs[row.source];
+          if(val===undefined) continue;
+          if(row.mode==="add"){
+            params.set(row.target,params.get(row.target)+val*row.depth);
+          }else if(row.mode==="scale"){
+            params.set(row.target,Math.max(0.1,val*row.depth));
+          }else if(row.mode==="set"){
+            params.set(row.target,val);
+          }else if(row.mode==="lookup"){
+            const table=row.table||{}; if(val in table) params.set(row.target,table[val]);
+          }else if(row.mode==="preset"&&row.target==="*MULTI*"){
+            const preset=PITCH_PRESETS[val]||PITCH_PRESETS.default;
+            Object.keys(preset).forEach(k=>params.set(k,preset[k]));
+          }
+        }
+      }
+    }
+
+    const modMatrix=new ModMatrix(DEFAULT_ROUTING);
+
+    /* ---------- 5. RENDERER (Canvas2D for simplicity) ---------- */
+    const canvas=document.getElementById("gl");
+    const ctx=canvas.getContext("2d");
+    const resize=()=>{canvas.width=innerWidth;canvas.height=innerHeight};
+    addEventListener("resize",resize);resize();
+
+    // Hypercube geometry (16 verts, 32 edges)
+    const baseVerts=[];for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])for(const w of[-1,1])baseVerts.push([x,y,z,w]);
+    const edges=[];for(let i=0;i<16;i++)for(let j=i+1;j<16;j++)if(baseVerts[i].filter((c,k)=>c!==baseVerts[j][k]).length===1)edges.push([i,j]);
+
+    function project4Dto2D(v){
+      const [x,y,z,w]=v;
+      const k=300/(300-w*150);
+      return [x*150*k,y*150*k];
+    }
+
+    function getColor(idx,hueShift){
+      const scheme=params.get("colorScheme");
+      if(scheme==="grayscale")return`hsl(0 0% ${idx*100}%)`;
+      if(scheme==="monochrome")return`hsl(${(hueShift)%360} 80% ${idx*50+20}% )`;
+      if(scheme==="steppedRainbow"){const clrs=["#f00","#fa0","#ff0","#0f0","#0ff","#00f","#90f","#f0f"];return clrs[idx%8];}
+      if(scheme==="smoothRainbow")return`hsl(${idx*30+hueShift} 70% 55%)`;
+      if(scheme==="mood"){return["#8ecae6","#219ebc","#023047","#ffb703","#fb8500"][idx%5];}
+      return"#fff";
+    }
+
+    let hueShift=0;
+    function draw(time){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const rotXY=params.get("rotXY"),rotXZ=params.get("rotXZ"),rotXW=params.get("rotXW"),rotYZ=params.get("rotYZ"),rotYW=params.get("rotYW"),rotZW=params.get("rotZW");
+      const zoomX=params.get("zoomX"),zoomY=params.get("zoomY");
+      // derived vertices
+      const verts=baseVerts.map(v=>v.slice());
+      const rot=(v,i,j,ang)=>{
+        const a=v[i],b=v[j];
+        v[i]=a*Math.cos(ang)-b*Math.sin(ang);
+        v[j]=a*Math.sin(ang)+b*Math.cos(ang);
+      };
+      for(const v of verts){
+        rot(v,0,1,rotXY);rot(v,0,2,rotXZ);rot(v,0,3,rotXW);
+        rot(v,1,2,rotYZ);rot(v,1,3,rotYW);rot(v,2,3,rotZW);
+      }
+      const proj=verts.map(project4Dto2D);
+      ctx.save();
+      ctx.translate(canvas.width/2,canvas.height/2);
+      ctx.scale(zoomX,zoomY);
+      hueShift+=0.2;
+      edges.forEach((e,i)=>{
+        const [x1,y1]=proj[e[0]], [x2,y2]=proj[e[1]];
+        ctx.strokeStyle=getColor(i,hueShift);
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    /* ---------- 6. UI BUILDER ---------- */
+    const paramsSec=document.getElementById("paramsSec");
+    PARAM_DEFS.forEach(def=>{
+      const div=document.createElement("div");div.className="control";
+      if(def.type==="range"){
+        div.innerHTML=`<label>${def.label}<span id="val-${def.id}">${def.def}</span></label><input type="range" id="in-${def.id}" min="${def.min}" max="${def.max}" step="${def.step}" value="${def.def}">`;
+        paramsSec.appendChild(div);
+        const rng=div.querySelector("input");const span=div.querySelector("span");
+        rng.oninput=()=>{params.set(def.id,parseFloat(rng.value));span.textContent=parseFloat(rng.value).toFixed(2);} ;
+        params.onChange((id,val)=>{if(id===def.id){rng.value=val;span.textContent=val.toFixed?val.toFixed(2):val;}});
+      }else if(def.type==="select"){
+        const sel=document.createElement("select");sel.id="in-"+def.id;
+        def.options.forEach(o=>{const op=document.createElement("option");op.value=o;op.textContent=o;sel.appendChild(op);} );
+        sel.value=def.def;
+        sel.onchange=()=>params.set(def.id,sel.value);
+        params.onChange((id,val)=>{if(id===def.id)sel.value=val;});
+        div.innerHTML=`<label>${def.label}</label>`;
+        div.appendChild(sel);
+        paramsSec.appendChild(div);
+      }
+    });
+
+    /* ----- Routing UI ---- */
+    const routingSec=document.getElementById("routingSec");
+    function buildRoutingUI(){
+      routingSec.innerHTML="";
+      DEFAULT_ROUTING.forEach((row,idx)=>addRoutingRow(row,idx));
+      const addBtn=document.createElement("button");addBtn.className="addBtn";addBtn.textContent="+ Add Row";addBtn.onclick=()=>addRoutingRow({source:"scroll",target:"zoomX",mode:"add",depth:1},DEFAULT_ROUTING.length);
+      routingSec.appendChild(addBtn);
+    }
+    function addRoutingRow(row,idx){
+      const cont=document.createElement("div");cont.className="routingRow";
+      const selSrc=document.createElement("select");["scroll","tiltX","tiltY","pitchClass","timbreCentroid","time"].forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;selSrc.appendChild(o);} );
+      selSrc.value=row.source;
+      const selTgt=document.createElement("select");PARAM_DEFS.map(d=>d.id).concat(["*MULTI*"]).forEach(t=>{const o=document.createElement("option");o.value=t;o.textContent=t;selTgt.appendChild(o);} );
+      selTgt.value=row.target;
+      const rng=document.createElement("input");rng.type="range";rng.min=0;rng.max=5;rng.step=0.1;rng.value=row.depth||1;
+      const del=document.createElement("button");del.textContent="✕";del.onclick=()=>{DEFAULT_ROUTING.splice(idx,1);buildRoutingUI();};
+      cont.append(selSrc,selTgt,rng,del);routingSec.appendChild(cont);
+      selSrc.onchange=()=>row.source=selSrc.value;
+      selTgt.onchange=()=>row.target=selTgt.value;
+      rng.oninput=()=>row.depth=parseFloat(rng.value);
+    }
+    buildRoutingUI();
+
+    /* ----- Pitch preset UI ---- */
+    const pitchSec=document.getElementById("pitchSec");
+    function buildPitchUI(){
+      pitchSec.innerHTML="";
+      const names=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+      names.forEach(pc=>{
+        const row=document.createElement("div");row.className="pitchRow";
+        const lab=document.createElement("span");lab.textContent=pc;
+        const selCS=document.createElement("select");PARAM_DEFS.find(d=>d.id==="colorScheme").options.forEach(o=>{const op=document.createElement("option");op.value=o;op.textContent=o;selCS.appendChild(op);} );
+        selCS.value=PITCH_PRESETS[pc]?.colorScheme||"grayscale";
+        const rng=document.createElement("input");rng.type="range";rng.min=-3;rng.max=3;rng.step=0.1;rng.value=PITCH_PRESETS[pc]?.rotXY||0;
+        row.append(lab,selCS,rng);
+        pitchSec.appendChild(row);
+        selCS.onchange=()=>{if(!PITCH_PRESETS[pc])PITCH_PRESETS[pc]={};PITCH_PRESETS[pc].colorScheme=selCS.value;};
+        rng.oninput=()=>{if(!PITCH_PRESETS[pc])PITCH_PRESETS[pc]={};PITCH_PRESETS[pc].rotXY=parseFloat(rng.value);} ;
+      });
+    }
+    buildPitchUI();
+
+    /* ----- Presets UI ---- */
+    const presetsSec=document.getElementById("presetsSec");
+    function buildPresetsUI(){
+      presetsSec.innerHTML="";
+      const bar=document.createElement("div");bar.id="presetBar";
+      const nameIn=document.createElement("input");nameIn.placeholder="Preset name";
+      const btnSave=document.createElement("button");btnSave.textContent="Save";
+      const btnLoad=document.createElement("button");btnLoad.textContent="Load";
+      bar.append(nameIn,btnSave,btnLoad);presetsSec.appendChild(bar);
+      const list=document.createElement("select");list.size=6;list.style.width="100%";presetsSec.appendChild(list);
+      function refreshList(){list.innerHTML="";Object.keys(localStorage).filter(k=>k.startsWith("hcPreset-")).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k.replace("hcPreset-","");list.appendChild(o);} );}
+      refreshList();
+      btnSave.onclick=()=>{
+        const n=nameIn.value||"untitled";
+        const data={params:params.toJSON(),routing:DEFAULT_ROUTING,pitch:PITCH_PRESETS};
+        localStorage.setItem("hcPreset-"+n,JSON.stringify(data));refreshList();};
+      btnLoad.onclick=()=>{
+        const sel=list.value;if(!sel)return;const data=JSON.parse(localStorage.getItem(sel));if(data){params.fromJSON(data.params);Object.assign(PITCH_PRESETS,data.pitch);DEFAULT_ROUTING.length=0;DEFAULT_ROUTING.push(...data.routing);buildRoutingUI();buildPitchUI();}
+      };
+    }
+    buildPresetsUI();
+
+    /* ---------- 7. CONFIG PANEL TOGGLE ---------- */
+    const panel=document.getElementById("configPanel");
+    let hPresses=[];addEventListener("keydown",e=>{if(e.key.toLowerCase()==="h"){const t=Date.now();hPresses.push(t);hPresses=hPresses.slice(-3);if(hPresses.length===3&&hPresses[2]-hPresses[0]<1000){panel.style.display=panel.style.display==="none"?"block":"none";}}});
+
+    /* tab switching */
+    document.querySelectorAll("#configTabs button").forEach(btn=>btn.onclick=()=>{
+      document.querySelectorAll("#configTabs button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");
+      const tab=btn.dataset.tab;document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+      document.getElementById(tab+"Sec").classList.add("active");
+    });
+
+    /* ---------- 8. MAIN LOOP ---------- */
+    function loop(time){
+      inputLayer.update(time);
+      modMatrix.process(inputLayer.values);
+      draw(time);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    /* ---------- 9. STATE SHARING VIA HASH ---------- */
+    function encodeState(){
+      const obj={p:params.toJSON(),r:DEFAULT_ROUTING,pit:PITCH_PRESETS};
+      location.hash="state="+LZString.compressToEncodedURIComponent(JSON.stringify(obj));
+    }
+    function decodeState(){
+      if(location.hash.startsWith("#state=")){
+        try{const data=JSON.parse(LZString.decompressFromEncodedURIComponent(location.hash.slice(7)));if(data){params.fromJSON(data.p);Object.assign(PITCH_PRESETS,data.pit);DEFAULT_ROUTING.length=0;DEFAULT_ROUTING.push(...data.r);buildRoutingUI();buildPitchUI();}}
+        catch(err){console.warn("bad hash",err);} }
+    }
+    window.addEventListener("hashchange",decodeState);
+    panel.addEventListener("change",()=>encodeState());
+    decodeState();
+  </script>
+</body>
+</html>
