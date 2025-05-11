@@ -6,4 +6,9 @@ A webapp visual metaphor that maps lower states of consciousness (coma, unrespon
 
 Latest at top.
 
+- [releases/V24n_modified.html](releases/V24n_modified.html)
 - [releases/V23o.html](releases/V23o.html)
+- [releases/19u.html](releases/19u.html)
+- [releases/4a.html](releases/4a.html)
+- [releases/0b.html](releases/0b.html)
+- [releases/0a.html](releases/0a.html)
