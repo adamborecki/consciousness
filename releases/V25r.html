@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Consciousness & Spatial Dimensions Webapp</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      background: #000;
+      color: #fff
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000
+    }
+
+    .scroll-container {
+      height: 500vh
+    }
+
+    /* fullscreen button */
+    #enterFull {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 28px;
+      font: 2rem sans-serif;
+      background: rgba(255, 255, 255, .08);
+      border: 1px solid rgba(255, 255, 255, .2);
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: background .3s, opacity .6s
+    }
+
+    #enterFull:hover {
+      background: rgba(255, 255, 255, .18)
+    }
+
+    /* scroll prompt */
+    #scrollPrompt {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font: 2rem sans-serif;
+      opacity: 0;
+      transition: opacity .8s ease;
+      pointer-events: none;
+      display: none
+    }
+
+    /* panel */
+    #paramsPanel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(30, 30, 30, .9);
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+      z-index: 1000;
+      max-width: 270px;
+      font-family: sans-serif
+    }
+
+    #paramsPanel label {
+      display: block;
+      margin: 8px 0;
+      font-size: 14px
+    }
+
+    #paramsPanel input[type=range] {
+      width: 120px;
+      vertical-align: middle
+    }
+
+    #paramsPanel span {
+      margin-left: 6px;
+      font-size: 12px;
+      color: #ccc
+    }
+
+    #stateInfo {
+      font-size: 13px;
+      line-height: 1.3
+    }
+
+    .oriBtn {
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .25);
+      color: #fff;
+      font: 600 13px/1 sans-serif;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer
+    }
+
+    .oriBtn:active {
+      background: rgba(255, 255, 255, .3)
+    }
+
+    hr {
+      border-color: #444;
+      margin: 6px 0
+    }
+
+    /* action orientation buttons */
+    .action-buttons {
+      position: fixed;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+    }
+
+    .action-buttons.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+
+    /* action buttons */
+    .action-btn {
+      position: fixed;
+      opacity: 0;
+      pointer-events: none;
+      transition: background .3s, opacity .6s ease;
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .3);
+      font-family: sans-serif;
+      font-size: 1.2rem;
+      color: #fff;
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 4px;
+    }
+
+    #actionTL {
+      position: fixed;
+      top: 30%;
+      left: 30%;
+    }
+
+    #actionTR {
+      position: fixed;
+      top: 30%;
+      left: 70%;
+    }
+
+    #actionBL {
+      position: fixed;
+      top: 70%;
+      left: 30%;
+    }
+
+    #actionBR {
+      position: fixed;
+      top: 70%;
+      left: 70%;
+    }
+
+
+    #actionTL.show>button,
+    #actionTR.show>button,
+    #actionBL.show>button,
+    #actionBR.show>button {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+
+
+    /* center action buttons within their containers */
+    .action-buttons>button {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+
+    /* Active/disabled state for orientation buttons */
+    .oriBtn.active,
+    .action-btn.active {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: #fff;
+      cursor: default;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* Hide cursor until action buttons appear */
+    body.hideCursor,
+    canvas.hideCursor {
+      cursor: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="enterFull">Enter Fullscreen?</div>
+  <div id="scrollPrompt">Scroll&nbsp;down?&nbsp;↓</div>
+  <div class="scroll-container"></div>
+
+  <!-- Help panel (aka help menu) -->
+  <div id="paramsPanel">
+    <!-- Orientation buttons - not to be confused with action buttons, although functionality is similar -->
+    <div id="orientationBtns" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="oriBtn" data-key="cube">Cube</button>
+      <button class="oriBtn" data-key="square">Square</button>
+      <button class="oriBtn" data-key="line">Line</button>
+      <button class="oriBtn" data-key="corner">Corner</button>
+    </div>
+    <hr />
+    <label>Zoom X:<input type="range" id="zoomX" min="0.5" max="4" step="0.01" value="2" /><span
+        id="zoomXVal">2.00</span></label>
+    <label>Zoom Y:<input type="range" id="zoomY" min="0.5" max="4" step="0.01" value="2" /><span
+        id="zoomYVal">2.00</span></label>
+    <hr />
+    <label>Return Time:<input type="range" id="retMaster" min="0.1" max="10" step="0.1" value="0.4" /><span
+        id="retMasterVal">0.4s</span></label>
+    <label>Scroll Duration:<input type="range" id="scrollDurationSlider" min="0.1" max="5" step="0.1"
+        value="0.6" /><span id="scrollDurationValue">1.6s</span></label>
+    <div class="param">
+      <label for="scrollPositionSlider">Scroll Position: <span id="scrollPositionValue">0%</span></label>
+      <input type="range" id="scrollPositionSlider" min="0" max="100" step="1" value="0">
+    </div>
+
+    <label>Neighbor Impact:<input type="range" id="impactNeighbors" min="0" max="1" step="0.01" value="0" /><span
+        id="impactNeighborsVal">0×</span></label>
+    <hr />
+    <label>Rot XY:<input type="range" id="rotXY" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotXYVal">0.00</span></label>
+    <label>Rot XZ:<input type="range" id="rotXZ" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotXZVal">0.00</span></label>
+    <label>Rot XW:<input type="range" id="rotXW" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotXWVal">0.00</span></label>
+    <label>Rot YZ:<input type="range" id="rotYZ" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotYZVal">0.00</span></label>
+    <label>Rot YW:<input type="range" id="rotYW" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotYWVal">0.00</span></label>
+    <label>Rot ZW:<input type="range" id="rotZW" min="-5" max="5" step="0.1" value="0" /><span
+        id="rotZWVal">0.00</span></label>
+    <hr />
+    <div id="stateInfo"></div>
+  </div> <!-- end paramsPanel -->
+  </div> <!-- end paramsPanel -->
+
+  <!-- action orientation buttons -->
+  <div id="actionTL" class="action-buttons"></div>
+  <div id="actionTR" class="action-buttons"></div>
+  <div id="actionBL" class="action-buttons"></div>
+  <div id="actionBR" class="action-buttons"></div>
+
+  <script>
+    (function () {
+      // Mouse zone calculation module
+      window.mouseModule = {
+        deadZoneXStart: 0.49,
+        deadZoneXEnd: 0.51,
+        deadZoneYStart: 0.49,
+        deadZoneYEnd: 0.51,
+        innerZoneXStart: 0.2,
+        innerZoneXEnd: 0.8,
+        innerZoneYStart: 0.2,
+        innerZoneYEnd: 0.8,
+        innerScalar: 4,
+        outerScalar: 28
+      };
+      // Audio playback objects
+      const soundStart = new Audio('sounds/start.mp3');
+      const actionSounds = { cube: new Audio('sounds/cube.mp3'), square: new Audio('sounds/square.mp3'), line: new Audio('sounds/line.mp3'), corner: new Audio('sounds/corner.mp3') };
+      const outerZoneSounds = { outerN: new Audio('sounds/outerN.mp3'), outerNE: new Audio('sounds/outerNE.mp3'), outerE: new Audio('sounds/outerE.mp3'), outerSE: new Audio('sounds/outerSE.mp3'), outerS: new Audio('sounds/outerS.mp3'), outerSW: new Audio('sounds/outerSW.mp3'), outerW: new Audio('sounds/outerW.mp3'), outerNW: new Audio('sounds/outerNW.mp3') };
+      let previousZone = null;
+      // Transition state sounds
+      const transitionSounds = {
+        '0->1': new Audio('sounds/transition1.mp3'),
+        '1->2': new Audio('sounds/transition2.mp3'),
+        '2->3': new Audio('sounds/transition3.mp3'),
+        '3->2': new Audio('sounds/transition1.mp3'),
+        '2->1': new Audio('sounds/transition2.mp3'),
+        '1->0': new Audio('sounds/transition3.mp3')
+      };
+      // Atmosphere audio
+      const atmosphere = new Audio('sounds/atmosphere.mp3');
+      atmosphere.loop = true;
+      atmosphere.volume = 0;
+      // Audio settings for smoothing
+      window.audioSettings = {
+        atmosphereMaxVolume: 0.75,
+        atmosphereEnterFadeDuration: 0.4,  // seconds
+        atmosphereExitFadeDuration: 0.6   // seconds
+      };
+
+      // Fade utility for atmosphere
+      let atmosphereFadeInterval = null;
+
+function fadeAtmosphereTo(target, duration) {
+        // Clear any ongoing fade
+        if (atmosphereFadeInterval) clearInterval(atmosphereFadeInterval);
+        const stepTime = 50;
+        const steps = duration / stepTime;
+        const delta = (target - atmosphere.volume) / steps;
+        let count = 0;
+        atmosphereFadeInterval = setInterval(() => {
+          atmosphere.volume = Math.max(0, Math.min(1, atmosphere.volume + delta));
+          count++;
+          if (count >= steps) clearInterval(fadeInterval);
+        }, stepTime);
+      }
+
+      
+      function computeZoneAndNormalized(x, y) {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const {
+          deadZoneXStart, deadZoneXEnd, deadZoneYStart, deadZoneYEnd,
+          innerZoneXStart, innerZoneXEnd, innerZoneYStart, innerZoneYEnd
+        } = window.mouseModule;
+
+        const deadLeft = width * deadZoneXStart;
+        const deadRight = width * deadZoneXEnd;
+        const deadTop = height * deadZoneYStart;
+        const deadBottom = height * deadZoneYEnd;
+
+        // Deadzone check
+        if (x >= deadLeft && x <= deadRight && y >= deadTop && y <= deadBottom) {
+          return { zone: 'deadzone', normalizedX: null, normalizedY: null };
+        }
+
+        const innerLeft = width * innerZoneXStart;
+        const innerRight = width * innerZoneXEnd;
+        const innerTop = height * innerZoneYStart;
+        const innerBottom = height * innerZoneYEnd;
+
+        // Determine if in inner box
+        const inInner = x >= innerLeft && x <= innerRight && y >= innerTop && y <= innerBottom;
+        const prefix = inInner ? 'inner' : 'outer';
+
+        // Classify direction keys
+        let horizKey, vertKey;
+        if (inInner) {
+          horizKey = x < deadLeft ? 'W' : x > deadRight ? 'E' : 'C';
+          vertKey  = y < deadTop  ? 'N' : y > deadBottom ? 'S' : 'C';
+        } else {
+          horizKey = x < innerLeft ? 'W' : x > innerRight ? 'E' : 'C';
+          vertKey  = y < innerTop  ? 'N' : y > innerBottom ? 'S' : 'C';
+        }
+
+        // Compose zone direction
+        let dir;
+        if (vertKey === 'C') dir = horizKey;
+        else if (horizKey === 'C') dir = vertKey;
+        else dir = vertKey + horizKey;
+        const zone = prefix + dir;
+
+        // Compute region boundaries for normalization
+        let regionLeft, regionRight, regionTop, regionBottom;
+        if (inInner) {
+          regionLeft   = horizKey === 'W' ? innerLeft  : horizKey === 'C' ? deadLeft   : deadRight;
+          regionRight  = horizKey === 'W' ? deadLeft   : horizKey === 'C' ? deadRight  : innerRight;
+          regionTop    = vertKey  === 'N' ? innerTop   : vertKey  === 'C' ? deadTop    : deadBottom;
+          regionBottom = vertKey  === 'N' ? deadTop    : vertKey  === 'C' ? deadBottom : innerBottom;
+        } else {
+          regionLeft   = horizKey === 'W' ? 0          : horizKey === 'C' ? innerLeft  : innerRight;
+          regionRight  = horizKey === 'W' ? innerLeft  : horizKey === 'C' ? innerRight : width;
+          regionTop    = vertKey  === 'N' ? 0          : vertKey  === 'C' ? innerTop   : innerBottom;
+          regionBottom = vertKey  === 'N' ? innerTop   : vertKey  === 'C' ? innerBottom: height;
+        }
+
+        // Normalize coordinates within region
+        const rawX = (x - regionLeft) / (regionRight - regionLeft);
+        const rawY = (y - regionTop)  / (regionBottom - regionTop);
+        const normalizedX = horizKey === 'W' ? 1 - rawX : rawX;
+        const normalizedY = vertKey  === 'N' ? 1 - rawY : rawY;
+
+        return { zone, normalizedX, normalizedY };
+      }
+
+      // Control flags and scalars
+      let outerZoneControlActive = false;
+      const innerScalar = window.mouseModule.innerScalar;
+      const outerScalar = window.mouseModule.outerScalar;
+
+      function zoneHandler(e) {
+        const { zone, normalizedX, normalizedY } = computeZoneAndNormalized(e.clientX, e.clientY);
+        
+        // Handle outer-zone sounds and atmosphere
+        if (outerZoneControlActive) {
+          if (zone.startsWith('outer') && zone !== previousZone && outerZoneSounds[zone].paused) {
+            outerZoneSounds[zone].play();
+          }
+          if (zone.startsWith('outer')) {
+            if (atmosphere.paused) atmosphere.play();
+            fadeAtmosphereTo(window.audioSettings.atmosphereMaxVolume, window.audioSettings.atmosphereEnterFadeDuration * 1000);
+          } else {
+            fadeAtmosphereTo(0, window.audioSettings.atmosphereExitFadeDuration * 1000);
+          }
+        }
+        previousZone = zone;
+
+        raw.xz = 0;
+        raw.yz = 0;
+        if (zone === 'deadzone') return;
+        if (zone.startsWith('inner')) {
+          if (zone.includes('N')) raw.yw = normalizedY * innerScalar;
+          if (zone.includes('S')) raw.yw = -normalizedY * innerScalar;
+          if (zone.includes('E')) raw.xw = normalizedX * innerScalar;
+          if (zone.includes('W')) raw.xw = -normalizedX * innerScalar;
+        }
+        if (outerZoneControlActive && zone.startsWith('outer')) {
+          if (zone.includes('N')) raw.yz = normalizedY * outerScalar;
+          if (zone.includes('S')) raw.yz = -normalizedY * outerScalar;
+          if (zone.includes('E')) raw.xz = normalizedX * outerScalar;
+          if (zone.includes('W')) raw.xz = -normalizedX * outerScalar;
+        }
+      }
+      document.addEventListener('mousemove', zoneHandler);
+
+      let autoScrollCalled = false;
+      const canvas = document.getElementById("canvas"), ctx = canvas.getContext("2d");
+      const resize = () => { canvas.width = innerWidth; canvas.height = innerHeight }; addEventListener("resize", resize); resize();
+
+      /* fullscreen and prompt */
+      const fullBtn = document.getElementById("enterFull"),
+        prompt = document.getElementById("scrollPrompt");
+      let promptVisible = false;
+      let scrollTopCount = 0;
+      const fsEnabled = document.fullscreenEnabled;
+      fullBtn.addEventListener('click', async () => {
+        if (fsEnabled && !document.fullscreenElement) {
+          try {
+            await document.documentElement.requestFullscreen();
+            fullBtn.style.display = 'none';
+            prompt.style.display = 'block';
+            requestAnimationFrame(() => prompt.style.opacity = 1);
+            promptVisible = true;
+            document.body.classList.add('hideCursor');
+          
+          soundStart.play();
+          atmosphere.play();
+          // Start atmosphere loop at zero volume
+        } catch (e) {
+            console.error('Error attempting to enable full-screen mode:', e);
+          }
+        }
+      });
+
+      window.addEventListener('scroll', () => {
+        if (window.scrollY === 0) {
+          if (scrollTopCount < 3 && !promptVisible) {
+            prompt.style.display = 'block';
+            requestAnimationFrame(() => prompt.style.opacity = 1);
+            promptVisible = true;
+            scrollTopCount++;
+          }
+        } else {
+          if (promptVisible) {
+            prompt.style.opacity = 0;
+            promptVisible = false;
+          }
+        }
+      }, { passive: true });
+      /* state data */
+
+      const stateData = [{ State: "Coma", Awake: false, Aware: false, Eyes: false, Moves: false, Talks: false, Brain: "⚫ (Flat)", "3D": "• Point", Audio: "🎵 Single Note" },
+      { State: "UWS", Awake: true, Aware: false, Eyes: true, Moves: false, Talks: false, Brain: "⚪ (Low)", "3D": "— Line", Audio: "🔁 Pan (L↔R)" },
+      { State: "MCS", Awake: true, Aware: "⚠️ Partial", Eyes: true, Moves: "⚠️ Inconsistent", Talks: "⚠️ Inconsistent", Brain: "🟡 (Mixed)", "3D": "▭ Square", Audio: "📏 Depth (vol/rev)" },
+      { State: "Full", Awake: true, Aware: true, Eyes: true, Moves: true, Talks: true, Brain: "🟢 (Normal)", "3D": "◻ Cube", Audio: "🎧 3D + Frequency" },
+      { State: "Altered", Awake: true, Aware: "⚠️/✅", Eyes: "✅/⚠️", Moves: "✅/⚠️", Talks: "⚠️/✅", Brain: "🌈 (Expanded)", "3D": "⬛ Tesseract", Audio: "🧠 MS / Binaural" }];
+      const stateInfo = document.getElementById("stateInfo"); const showState = i => {
+        const s = stateData[i]; stateInfo.innerHTML = `<strong>${s.State}</strong><br>
+  Awake: ${s.Awake}<br>Aware: ${s.Aware}<br>Eyes: ${s.Eyes}<br>Moves: ${s.Moves}<br>Talks: ${s.Talks}<br>Brain: ${s.Brain}<br>3D: ${s["3D"]}<br>Audio: ${s.Audio}`
+      };
+
+      /* physics vars */
+      const pairs = ["xy", "xz", "xw", "yz", "yw", "zw"]; const raw = {}, target = {}, cur = {}, ang = {}, def = {}; pairs.forEach(k => raw[k] = target[k] = cur[k] = ang[k] = def[k] = 0);
+      const neighbors = { xy: ["xz", "xw", "yz", "yw"], xz: ["xy", "xw", "yz", "zw"], xw: ["xy", "xz", "yw", "zw"], yz: ["xy", "xz", "yw", "zw"], yw: ["xy", "xz", "yz", "zw"], zw: ["xz", "xw", "yw", "yz"] };
+      let masterTime = 0.2, neighborImpact = 0, zoomX = 2, zoomY = 2, stiff = 0.05, damp = 0.9
+      let scrollDuration = 1.6;
+
+      /* orientation buttons (spring via def*) */
+      const presets = { cube: { xy: Math.PI / 2, xz: 0, xw: 0, yz: 0, yw: 0, zw: 0 }, square: { xy: 0, xz: 0, xw: Math.PI / 2, yz: 0, yw: 0, zw: 0 }, line: { xy: 0, xz: 0, xw: 0, yz: 0, yw: 0, zw: 0 }, corner: { xy: 0, xz: 0, xw: 0, yz: 0, yw: Math.PI / 2, zw: 0 } };
+      // Highlight active orientation button and disable it
+      function updateActiveOrientation(key) {
+        document.querySelectorAll('.oriBtn').forEach(b => {
+          if (b.dataset.key === key) {
+            b.classList.add('active');
+            b.disabled = true;
+          } else {
+            b.classList.remove('active');
+            b.disabled = false;
+          }
+        });
+        document.querySelectorAll('.action-btn').forEach(b => {
+          if (b.dataset.key === key) {
+            b.classList.add('active');
+            b.disabled = true;
+          } else {
+            b.classList.remove('active');
+            b.disabled = false;
+          }
+        });
+      }
+      updateActiveOrientation('cube');
+      // Scroll back to top on first Square orientation
+      function easeInOutQuad(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+      function smoothScrollToTop(duration) {
+        const startY = window.scrollY;
+        const startTime = performance.now();
+        function scrollFrame(time) {
+          const elapsed = time - startTime;
+          const progress = Math.min(elapsed / (duration * 1000), 1);
+          window.scrollTo(0, startY * (1 - easeInOutQuad(progress)));
+          if (elapsed < duration * 1000) {
+            requestAnimationFrame(scrollFrame);
+          }
+        }// Slider control for scroll duration
+        let scrollDuration = 1.6;
+        document.getElementById('scrollDurationSlider').addEventListener('input', (e) => {
+          scrollDuration = parseFloat(e.target.value);
+          document.getElementById('scrollDurationValue').textContent = scrollDuration;
+        });
+
+        requestAnimationFrame(scrollFrame);
+      }
+      let backup = null; const setDef = p => pairs.forEach(k => def[k] = p[k]);
+      document.querySelectorAll(".oriBtn").forEach(b => {
+        const key = b.dataset.key;
+        b.addEventListener('click', () => {
+          setDef(presets[key]);
+          ; updateActiveOrientation(key);
+        });
+      });
+
+      /* sliders */
+      const bind = (id, cb) => { const s = document.getElementById(id), v = document.getElementById(id + "Val"); s.oninput = e => { cb(+e.target.value); if (v) v.textContent = id === "impactNeighbors" ? e.target.value + "×" : (+e.target.value).toFixed(2) } };
+      bind("zoomX", v => zoomX = v); bind("zoomY", v => zoomY = v); bind("retMaster", v => masterTime = v); bind("impactNeighbors", v => neighborImpact = v);
+      // Scroll duration slider listener
+      document.getElementById("scrollDurationSlider").addEventListener("input", e => {
+        scrollDuration = parseFloat(e.target.value);
+        document.getElementById("scrollDurationValue").textContent = scrollDuration + "s";
+      });
+
+      // Sync slider with scroll position
+      const scrollPositionSlider = document.getElementById('scrollPositionSlider');
+      const scrollPositionValue = document.getElementById('scrollPositionValue');
+
+      window.addEventListener('scroll', () => {
+        const prog = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+        const percent = Math.round(prog * 100);
+        scrollPositionSlider.value = percent;
+        scrollPositionValue.textContent = percent + '%';
+      });
+
+      scrollPositionSlider.addEventListener('input', (e) => {
+        const percent = parseInt(e.target.value, 10);
+        const y = percent / 100 * (document.body.scrollHeight - window.innerHeight);
+        window.scrollTo(0, y);
+      });
+
+      pairs.forEach(p => { const el = document.getElementById("rot" + p.toUpperCase()); el.oninput = e => raw[p] = +e.target.value; el.onpointerup = () => raw[p] = 0 });
+
+      /* triple‑h toggle */
+      const panel = document.getElementById("paramsPanel"), log = []; addEventListener("keydown", e => { const t = Date.now(); log.push(t); log.length > 3 && log.shift(); if (e.key === "h" && log[2] - log[0] < 1000) panel.style.display = panel.style.display === "block" ? "none" : "block" });
+
+      /* geometry */
+      const verts = []; for (const xi of [-1, 1]) for (const yi of [-1, 1]) for (const zi of [-1, 1]) for (const wi of [-1, 1]) verts.push({ x: xi, y: yi, z: zi, w: wi });
+      const edges = []; for (let i = 0; i < verts.length; i++)for (let j = i + 1; j < verts.length; j++) { if (["x", "y", "z", "w"].filter(a => verts[i][a] !== verts[j][a]).length === 1) edges.push([i, j]) }
+
+      const rot = (v, i, j, θ) => {
+        const a = ["x", "y", "z", "w"][i], b = ["x", "y", "z", "w"][j], ai = v[a], bi = v[b];
+        v[a] = ai * Math.cos(θ) - bi * Math.sin(θ); v[b] = ai * Math.sin(θ) + bi * Math.cos(θ);
+      };
+
+      /* animation */
+      let last = performance.now(), stateIdx = -1;
+      let parallaxClamped = false; // clamp parallax after action button scroll
+      function loop(now) {
+        const dt = (now - last) / 1000; last = now;
+        const prog = scrollY / (document.documentElement.scrollHeight - innerHeight);
+        const rawIdx = (window.scrollY === 0) ? 0 : (prog < 0.2 ? 1 : (prog < 0.6 ? 2 : 3));
+        const idx = parallaxClamped && rawIdx > 3 ? 3 : rawIdx;
+        // Determine if projection is altered (4D rotations present)
+        const isAltered = raw.xz !== 0 || raw.yz !== 0 || raw.zw !== 0 || def.xz !== 0 || def.yz !== 0 || def.zw !== 0;
+        const displayIdx = isAltered ? 4 : idx;
+        if (displayIdx !== stateIdx) {
+          const prev = stateIdx;
+          const next = displayIdx;
+          const key = `${prev}->${next}`;
+          if (transitionSounds[key] && transitionSounds[key].paused) {
+            transitionSounds[key].currentTime = 0;
+            transitionSounds[key].play();
+          }
+          stateIdx = next;
+          showState(next);
+        }
+        pairs.forEach(k => { let s = raw[k] + neighborImpact * neighbors[k].reduce((sum, n) => sum + raw[n], 0); target[k] = s });
+        pairs.forEach(k => { cur[k] += (target[k] - cur[k]) * stiff; cur[k] *= damp; ang[k] += cur[k] * dt; ang[k] += (def[k] - ang[k]) * (dt / masterTime) });
+        const sX = Math.min(prog / .2, 1), sY = Math.min(Math.max((prog - .2) / .2, 0), 1), sZ = Math.min(Math.max((prog - .4) / .2, 0), 1), sW = Math.min(Math.max((prog - .6) / .2, 0), 1), f = Math.min(Math.max((prog - .8) / .2, 0), 1);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        draw({ sX, sY, sZ, sW, f });
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+
+      function draw(dim) {
+        const { sX, sY, sZ, sW } = dim;
+        const tmp = verts.map(v => ({ x: v.x * sX, y: v.y * sY, z: v.z * sZ, w: v.w * sW }));
+        tmp.forEach(v => { rot(v, 0, 1, ang.xy); rot(v, 0, 2, ang.xz); rot(v, 0, 3, ang.xw); rot(v, 1, 2, ang.yz); rot(v, 1, 3, ang.yw); rot(v, 2, 3, ang.zw) });
+        const pr = tmp.map(v => { const k = 300 / (300 - v.w * 150); return { x: v.x * 150 * k, y: v.y * 150 * k } });
+        ctx.save(); ctx.translate(canvas.width / 2, canvas.height / 2); ctx.scale(zoomX, zoomY); ctx.lineWidth = 2;
+        edges.forEach(e => { const p1 = pr[e[0]], p2 = pr[e[1]]; ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke() });
+        ctx.restore();
+      }
+
+
+      // animated action buttons on near-bottom scroll
+      let phase = 0;
+      const actionConfigs = [
+        { id: 'actionTL', key: 'cube', label: '&nbsp;' },
+        { id: 'actionTR', key: 'square', label: '&nbsp;' },
+        { id: 'actionBL', key: 'line', label: '&nbsp;' },
+        { id: 'actionBR', key: 'corner', label: '&nbsp;' }
+      ];
+      let actionsReleased = false;
+      window.addEventListener('scroll', () => {
+        if (actionsReleased) return;
+        const scrollPos = window.scrollY + window.innerHeight;
+        const threshold = document.body.scrollHeight - 100;
+        if (scrollPos >= threshold) {
+          actionsReleased = true;
+          actionConfigs.forEach(cfg => {
+            const container = document.getElementById(cfg.id);
+            container.innerHTML = '';
+            const btn = document.createElement('button');
+            btn.className = 'action-btn';
+            btn.dataset.key = cfg.key;
+            btn.id = 'action-button-' + cfg.key;
+            btn.innerHTML = cfg.label;
+            btn.id = 'action-button-' + cfg.key;
+            container.appendChild(btn);
+          });
+          animateActionButtons();
+        }
+      });
+
+      function animateActionButtons() {
+        let phase = 0;
+        const squareBtn = document.getElementById('action-button-square');
+        const cubeBtn = document.getElementById('action-button-cube');
+        const lineBtn = document.getElementById('action-button-line');
+        const cornerBtn = document.getElementById('action-button-corner');
+        [squareBtn, cubeBtn, lineBtn, cornerBtn].forEach(btn => {
+          const cont = btn.parentElement;
+          cont.style.display = 'none';
+          cont.style.opacity = '0';
+          cont.style.pointerEvents = 'none';
+          cont.style.zIndex = '1000';
+          Object.assign(btn.style, {
+            zIndex: '1001',
+            position: 'fixed',
+            transition: 'all 0.5s',
+            transform: 'translate(-50%,-50%)',
+            opacity: '0'
+          });
+        });
+        phase = 0;
+        const revealSquare = () => {
+          const cont = squareBtn.parentElement;
+          cont.style.display = 'block';
+          cont.style.opacity = '1';
+          cont.style.pointerEvents = 'auto';
+          cont.style.zIndex = '1000';
+          Object.assign(squareBtn.style, { left: '50%', top: '50%' });
+          squareBtn.style.pointerEvents = 'auto';
+          setTimeout(() => {
+            squareBtn.style.opacity = '1';
+            document.body.classList.remove('hideCursor');
+            document.querySelector('canvas').classList.remove('hideCursor');
+          }, 10);
+        };
+        revealSquare();
+
+        squareBtn.addEventListener('click', function (e) {
+          
+          actionSounds.square.play();// Immediate orientation and scroll
+          setDef(presets.square);
+          updateActiveOrientation('square');
+          // uncomment this line to restore autoscroll functionality
+//          if (!autoScrollCalled) { smoothScrollToTop(scrollDuration); autoScrollCalled = true; }
+
+          if (phase === 0) {
+            e.stopImmediatePropagation();
+            phase = 1;
+            const cont = cubeBtn.parentElement;
+            cont.style.display = 'block';
+            cont.style.opacity = '1';
+            cont.style.pointerEvents = 'auto';
+            cont.style.zIndex = '1000';
+            Object.assign(cubeBtn.style, { left: '50%', top: '50%' });
+            cubeBtn.style.pointerEvents = 'auto';
+            setTimeout(() => {
+              Object.assign(squareBtn.style, { left: '75%', top: '50%' });
+              Object.assign(cubeBtn.style, { left: '25%', top: '50%', opacity: '1' });
+            }, 10);
+          }
+        }, true);
+
+        cubeBtn.addEventListener('click', function (e) {
+          
+          actionSounds.cube.play();// Immediate orientation
+          setDef(presets.cube);
+          updateActiveOrientation('cube');
+
+          if (phase === 1) {
+            e.stopImmediatePropagation();
+            phase = 2;
+            const cont = lineBtn.parentElement;
+            cont.style.display = 'block';
+            cont.style.opacity = '1';
+            cont.style.pointerEvents = 'auto';
+            cont.style.zIndex = '1000';
+            Object.assign(lineBtn.style, { left: '50%', top: '50%' });
+            lineBtn.style.pointerEvents = 'auto';
+            setTimeout(() => {
+              Object.assign(squareBtn.style, { left: '60%', top: '60%' });
+              Object.assign(cubeBtn.style, { left: '40%', top: '60%' });
+              Object.assign(lineBtn.style, { left: '50%', top: '40%', opacity: '1' });
+            }, 10);
+          }
+        }, true);
+
+        lineBtn.addEventListener('click', function (e) {
+          
+          actionSounds.line.play();// Immediate orientation
+          setDef(presets.line);
+          updateActiveOrientation('line');
+
+          if (phase === 2) {
+            e.stopImmediatePropagation();
+            phase = 3;
+            outerZoneControlActive = true;
+            const cont = cornerBtn.parentElement;
+            cont.style.display = 'block';
+            cont.style.opacity = '1';
+            cont.style.pointerEvents = 'auto';
+            cont.style.zIndex = '1000';
+            // idk if i need this next line? but i'll leave it in idk why not
+            Object.assign(cornerBtn.style, { left: '50%', top: '50%' });
+            cornerBtn.style.pointerEvents = 'auto';
+            setTimeout(() => {
+              Object.assign(cornerBtn.style, { left: '20%', top: '20%', opacity: '1' });
+              Object.assign(lineBtn.style, { left: '80%', top: '20%' });
+              Object.assign(cubeBtn.style, { left: '20%', top: '80%' });
+              Object.assign(squareBtn.style, { left: '80%', top: '80%' });
+            }, 10);
+          }
+        }, true);
+        cornerBtn.addEventListener('click', function (e) {
+          
+          actionSounds.corner.play();// Immediate orientation
+          setDef(presets.corner);
+          updateActiveOrientation('corner');
+        }, true);
+
+      }
+
+    })();</script>
+</body>
+
+</html>
