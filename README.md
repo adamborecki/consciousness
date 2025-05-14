@@ -9,24 +9,8 @@ You lean on a walls and the roof magically soars up into the sky! The floor slid
 This project is a webapp visual metaphor that maps lower states of consciousness (coma, unresponsive wakefulness syndrome, minimally conscious state, and full consciousness) to dimensions (point, line, square, cube). Altered states of consciousness are represented by a fourth spacial dimensions (tesseract a.k.a. hypercube). 
 
 
-## better view?
+## Check it out
 
-I think you should go here:
+To try it, go here:
 
 https://adamborecki.github.io/consciousness
-
-
-## releases:
-
-Latest at top.
-
-
-- [releases/V26.html](releases/V26.html)
-- [releases/V25.html](releases/V25.html)
-- [releases/V24n_modified2.html](releases/V24n_modified2.html)
-- [releases/V24n_modified.html](releases/V24n_modified.html)
-- [releases/V23.html](releases/V23.html)
-- [releases/V19.html](releases/V19.html)
-- [releases/V04.html](releases/V04.html)
-- [releases/V02.html](releases/V02.html)
-- [releases/V01.html](releases/V01.html)
