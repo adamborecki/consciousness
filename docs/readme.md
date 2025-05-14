@@ -14,10 +14,10 @@ This project is a webapp visual metaphor that maps lower states of consciousness
 
 
 
-## releases:
+## Play with it!
+# Releases:
 
-Latest at top.
-
+Usually the one at the top is the best:
 
 - [releases/V26.html](releases/V26.html)
 - [releases/V25.html](releases/V25.html)
