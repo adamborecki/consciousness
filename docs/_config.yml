@@ -3,3 +3,5 @@ description: A webapp visualizer that compares psychedelics / altered states of 
 show_downloads: false
 google_analytics:
 theme: jekyll-theme-midnight
+github:
+  is_project_page: false
