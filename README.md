@@ -14,3 +14,11 @@ This project is a webapp visual metaphor that maps lower states of consciousness
 To try it, go here:
 
 https://adamborecki.github.io/consciousness
+
+![Screenshot](docs/screenshot1.png)
+
+
+<p align="center">
+  <img src="docs/screenshot1.png" width="600" alt="Screenshot of the app">
+</p>
+
