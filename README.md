@@ -1,12 +1,12 @@
 # consciousness
 ## "thinking outside of the box" literally & figuratively
-Imagine you're inside a cube. How would you depict psychedelics / altered states of consciousness?
+Imagine your home is a cube. How would you depict psychedelics / altered states of consciousness?
 
-Picture yourself inside this 3D cube. The cube is perfect and perfectly comfortable.
+Picture yourself. You live inside a 3D cube. The cube is perfectly square and perfectly comfortable.
 
-You lean on a walls: the roof magically soars up into the sky while the floor is actually a beautifully reflective glass-bottom boat.
+You lean on a walls and the roof magically soars up into the sky! The floor slides out like a glass-bottom boat, revealing a stunning reflection of your colorful walls.
 
-This repo is a webapp visual metaphor that maps lower states of consciousness (coma, unresponsive wakefulness syndrome, minimally conscious state, and full consciousness) to dimensions (point, line, square, cube). Altered states of consciousness are represented by a fourth spacial dimensions (tesseract a.k.a. hypercube). 
+This project is a webapp visual metaphor that maps lower states of consciousness (coma, unresponsive wakefulness syndrome, minimally conscious state, and full consciousness) to dimensions (point, line, square, cube). Altered states of consciousness are represented by a fourth spacial dimensions (tesseract a.k.a. hypercube). 
 
 
 ## releases:
