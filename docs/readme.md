@@ -19,12 +19,12 @@ This project is a webapp visual metaphor that maps lower states of consciousness
 
 Usually the one at the top is the best:
 
-- [releases/V26.html](releases/V26.html)
-- [releases/V25.html](releases/V25.html)
-- [releases/V24n_modified2.html](releases/V24n_modified2.html)
-- [releases/V24n_modified.html](releases/V24n_modified.html)
-- [releases/V23.html](releases/V23.html)
-- [releases/V19.html](releases/V19.html)
-- [releases/V04.html](releases/V04.html)
-- [releases/V02.html](releases/V02.html)
-- [releases/V01.html](releases/V01.html)
+- [webapp/V26.html](webapp/V26.html)
+- [webapp/V25.html](webapp/V25.html)
+- [webapp/V24n_modified2.html](webapp/V24n_modified2.html)
+- [webapp/V24n_modified.html](webapp/V24n_modified.html)
+- [webapp/V23.html](webapp/V23.html)
+- [webapp/V19.html](webapp/V19.html)
+- [webapp/V04.html](webapp/V04.html)
+- [webapp/V02.html](webapp/V02.html)
+- [webapp/V01.html](webapp/V01.html)
